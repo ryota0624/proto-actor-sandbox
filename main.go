@@ -8,6 +8,8 @@ import (
 	"github.com/asynkron/protoactor-go/router"
 	"github.com/asynkron/protoactor-go/stream"
 	"github.com/ryota0624/proto-actor-sandbox/model"
+	"strconv"
+	"time"
 
 	"github.com/ryota0624/proto-actor-sandbox/actor/hero/loader"
 	"github.com/ryota0624/proto-actor-sandbox/actor/utility"
@@ -31,9 +33,25 @@ func main() {
 		}
 	})
 	loggerPid := context.Spawn(loggerProps)
+
+	heroWeightSumPid := context.Spawn(actor.PropsFromProducer(func() actor.Actor {
+		return utility.NewSumActor(loggerPid)
+	}))
+
+	mapToHeroWightSumPid := context.Spawn(
+		utility.NewMapper[model.Hero, utility.SumNumber](heroWeightSumPid, func(hero model.Hero) (utility.SumNumber, error) {
+			weight, err := strconv.Atoi(hero.Weight)
+			if err != nil {
+				return utility.SumNumber{}, err
+			}
+			return utility.SumNumber{
+				Int: weight,
+			}, nil
+		}))
+
 	context.Send(loggerPid, utility.InfoLog("Hello Logger"))
 
-	mapperPid := context.Spawn(router.NewRoundRobinGroup(
+	mapToLoggerPid := context.Spawn(router.NewRoundRobinGroup(
 		context.Spawn(utility.NewNonErrorMapper[any, utility.Log](loggerPid, func(from any) utility.Log {
 			return utility.InfoLogf("mapper 1 %+v", []any{from})
 		})),
@@ -61,11 +79,12 @@ func main() {
 	go func() {
 		for hero := range heroStream.C() {
 			heroStreamLogger.Info("received Hero", log.Object("hero", hero))
+			context.Send(mapToHeroWightSumPid, hero)
 		}
 	}()
 
 	composedHeroProcessor := context.Spawn(router.NewBroadcastGroup(
-		mapperPid,
+		mapToLoggerPid,
 		heroBatchStream.PID(),
 	))
 
@@ -79,5 +98,14 @@ func main() {
 	var a int
 	fmt.Scan(&a)
 	println("shutdown")
+
+	f := context.RequestFuture(heroWeightSumPid, utility.GetCurrentCalculated{}, 3*time.Second)
+	result, err := f.Result()
+	if err != nil {
+		fmt.Printf("err=%+v\n", err)
+	} else {
+		fmt.Printf("result=%+v\n", result)
+
+	}
 	sys.Shutdown()
 }

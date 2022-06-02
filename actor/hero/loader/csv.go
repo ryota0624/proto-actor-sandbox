@@ -14,6 +14,7 @@ type Load struct {
 	CSVPath  string
 	Receiver *actor.PID
 }
+
 type HeroCSVLoader struct{}
 
 func (state *HeroCSVLoader) Receive(context actor.Context) {

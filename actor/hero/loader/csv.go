@@ -4,7 +4,10 @@ import (
 	"bufio"
 	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/jszwec/csvutil"
+	"github.com/ryota0624/proto-actor-sandbox/model"
 	"os"
+	"strings"
 )
 
 type Load struct {
@@ -23,12 +26,26 @@ func (state *HeroCSVLoader) Receive(context actor.Context) {
 		}
 		csvScanner := bufio.NewScanner(csvFile)
 		csvScanner.Split(bufio.ScanLines)
+
+		var header string
+		if csvScanner.Scan() {
+			header = csvScanner.Text()
+		}
+
 		for csvScanner.Scan() {
-			fmt.Println(csvScanner.Text())
+			csv := strings.Join([]string{header, csvScanner.Text()}, "\n")
+			fmt.Printf("%s\n", csv)
+
+			var records []model.Hero
+			if err := csvutil.Unmarshal([]byte(csv), &records); err != nil {
+				fmt.Printf("%v\n", err)
+				return
+			}
+			context.Send(msg.Receiver, records)
 		}
 
 		if err := csvFile.Close(); err != nil {
-			println(err)
+			fmt.Printf("%v\n", err)
 			return
 		}
 	}

@@ -34,8 +34,6 @@ func (state *HeroCSVLoader) Receive(context actor.Context) {
 
 		for csvScanner.Scan() {
 			csv := strings.Join([]string{header, csvScanner.Text()}, "\n")
-			fmt.Printf("%s\n", csv)
-
 			var records []model.Hero
 			if err := csvutil.Unmarshal([]byte(csv), &records); err != nil {
 				fmt.Printf("%v\n", err)

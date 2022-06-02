@@ -26,12 +26,16 @@ func main() {
 	loggerPid := context.Spawn(loggerProps)
 	context.Send(loggerPid, utility.InfoLog("Hello Logger"))
 
+	mapperPid := context.Spawn(utility.NewNonErrorMapper[any, utility.Log](loggerPid, func(from any) utility.Log {
+		return utility.InfoLogf("%+v", []any{from})
+	}))
+
 	println("Start loader")
 	props := actor.PropsFromProducer(func() actor.Actor { return &loader.HeroCSVLoader{} })
 	pid := context.Spawn(props)
 	context.Send(pid, loader.Load{
 		CSVPath:  csvFilePath,
-		Receiver: nil,
+		Receiver: mapperPid,
 	})
 	var a int
 	fmt.Scan(&a)

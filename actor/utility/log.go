@@ -34,7 +34,9 @@ type LoggingActor struct{}
 func (state *LoggingActor) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case Log:
-		fmt.Printf("[%s] ", msg.Level)
+		fmt.Printf("[level:%s] ", msg.Level)
+		fmt.Printf("- [logger_id:%s] ", context.Self().Id)
+
 		fmt.Printf(msg.Format, msg.Data...)
 		fmt.Println()
 	}

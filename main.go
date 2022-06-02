@@ -30,7 +30,6 @@ func main() {
 		return utility.InfoLogf("%+v", []any{from})
 	}))
 
-	println("Start loader")
 	props := actor.PropsFromProducer(func() actor.Actor { return &loader.HeroCSVLoader{} })
 	pid := context.Spawn(props)
 	context.Send(pid, loader.Load{

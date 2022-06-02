@@ -1,8 +1,8 @@
 package utility
 
 import (
-	"fmt"
 	"github.com/asynkron/protoactor-go/actor"
+	"github.com/asynkron/protoactor-go/log"
 )
 
 type LogLevel string
@@ -12,32 +12,38 @@ const (
 )
 
 type Log struct {
-	Level  LogLevel
-	Format string
-	Data   []any
+	Level   LogLevel
+	Message string
+	Data    []any
 }
 
-func NewLog(level LogLevel, format string, data []any) *Log {
-	return &Log{Level: level, Format: format, Data: data}
+func NewLog(level LogLevel, message string, data []any) *Log {
+	return &Log{Level: level, Message: message, Data: data}
 }
 
 func InfoLog(str string) Log {
-	return Log{Level: INFO, Format: str, Data: nil}
+	return Log{Level: INFO, Message: str, Data: nil}
 }
 
-func InfoLogf(format string, data []any) Log {
-	return Log{Level: INFO, Format: format, Data: data}
+func InfoLogf(message string, data []any) Log {
+	return Log{Level: INFO, Message: message, Data: data}
 }
 
-type LoggingActor struct{}
+type LoggingActor struct {
+	Logger *log.Logger
+}
 
 func (state *LoggingActor) Receive(context actor.Context) {
 	switch msg := context.Message().(type) {
 	case Log:
-		fmt.Printf("[level:%s] ", msg.Level)
-		fmt.Printf("- [logger_id:%s] ", context.Self().Id)
+		fields := make([]log.Field, len(msg.Data))
+		for i, datum := range msg.Data {
+			fields[i] = log.Message(datum)
+		}
+		switch msg.Level {
+		case INFO:
+			state.Logger.Info(msg.Message, fields...)
+		}
 
-		fmt.Printf(msg.Format, msg.Data...)
-		fmt.Println()
 	}
 }

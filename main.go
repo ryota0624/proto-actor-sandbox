@@ -6,6 +6,8 @@ import (
 	"github.com/asynkron/protoactor-go/actor"
 	"github.com/asynkron/protoactor-go/log"
 	"github.com/asynkron/protoactor-go/router"
+	"github.com/asynkron/protoactor-go/stream"
+	"github.com/ryota0624/proto-actor-sandbox/model"
 
 	"github.com/ryota0624/proto-actor-sandbox/actor/hero/loader"
 	"github.com/ryota0624/proto-actor-sandbox/actor/utility"
@@ -43,12 +45,37 @@ func main() {
 		})),
 	))
 
+	heroBatchStream := stream.NewTypedStream[[]model.Hero](sys)
+	heroStream := stream.NewTypedStream[model.Hero](sys)
+
+	heroStreamLogger := log.New(log.InfoLevel, "hero-stream")
+
+	go func() {
+		for heroes := range heroBatchStream.C() {
+			for _, hero := range heroes {
+				context.Send(heroStream.PID(), hero)
+			}
+		}
+	}()
+
+	go func() {
+		for hero := range heroStream.C() {
+			heroStreamLogger.Info("received Hero", log.Object("hero", hero))
+		}
+	}()
+
+	composedHeroProcessor := context.Spawn(router.NewBroadcastGroup(
+		mapperPid,
+		heroBatchStream.PID(),
+	))
+
 	props := actor.PropsFromProducer(func() actor.Actor { return &loader.HeroCSVLoader{} })
 	pid := context.Spawn(props)
 	context.Send(pid, loader.Load{
 		CSVPath:  csvFilePath,
-		Receiver: mapperPid,
+		Receiver: composedHeroProcessor,
 	})
+
 	var a int
 	fmt.Scan(&a)
 	println("shutdown")
